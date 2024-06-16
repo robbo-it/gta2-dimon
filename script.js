@@ -19,6 +19,7 @@ let particles = [];
 let score = 0;
 let animationId;
 let countIntervalId;
+let spawnIntervalId;
 var audio = new Audio();
     audio.preload = 'auto';
     audio.src = 'shot.mp3';
@@ -26,120 +27,121 @@ var audioDeath = new Audio();
     audioDeath.preload = 'auto';
     audioDeath.src = 'death.mp3';
 
+document.addEventListener('click', () => {
+  audio = 0;
+  audio = new Audio();
+    audio.preload = 'auto';
+    audio.src = 'shot.mp3';
+  audio.play();
+})
+
+startGame();
+
+function startGame() {
+  init();
+  animate();
+  spawnEnemies();
+}
+
+
+function init() {
+  const movementLimits = {
+    minX: 0,
+    maxX: canvas.width,
+    minY: 0,
+    maxY: canvas.height,
+  };
+  player = new Player(canvas.width / 2, canvas.height / 2, context, movementLimits);
+  addEventListener("click", createProjectile);
+}
+
+function createProjectile(event) {
+  projectiles.push(
+    new Projectile(
+      player.x,
+      player.y,
+      event.clientX,
+      event.clientY,
+      context
+    )
+  );
+};
+
+function spawnEnemies() {
+  let countOfSpawnEnemies = 1;
+
+  countIntervalId = setInterval(() => countOfSpawnEnemies++, 30000);
+  spawnIntervalId = setInterval(() => spawnCountEnemies(countOfSpawnEnemies), 1000);
+
+  spawnCountEnemies(countOfSpawnEnemies)
+}
+
+function spawnCountEnemies(count) {
+  for (let i = 0; i < count; i++) {
+    enemies.push(new Enemy(canvas.width, canvas.height, context, player));
+  }
+}
+
+function animate() {
+  animationId = requestAnimationFrame(animate);
+  context.clearRect(0, 0, canvas.width, canvas.height);
+
+  particles = particles.filter(particle => particle.alpha > 0);
+  projectiles = projectiles.filter(projectileInsideWindow);
+  enemies.forEach(enemy => checkHittingEnemy(enemy));
+  enemies = enemies.filter(enemy => enemy.health > 0);
+  const isGameOver = enemies.some(checkHittingPlayer);
+  if (isGameOver) {
     document.addEventListener('click', () => {
-        audio = 0;
-        audio = new Audio();
-        audio.preload = 'auto';
-        audio.src = 'shot.mp3';
-        audio.play();
+      audio.pause();
     })
+    audioDeath.play();
+    wastedElement.style.display = "block";
+    clearInterval(countIntervalId);
+    clearInterval(spawnIntervalId);
+    cancelAnimationFrame(animationId);
+  }
 
-    startGame();
+  particles.forEach(particle => particle.update());
+  projectiles.forEach(projectile => projectile.update());
+  player.update();
+  enemies.forEach(enemy => enemy.update());
+}
 
-    function startGame() {
-        init();
-        animate();
-        spawnEnemies();
+function projectileInsideWindow(projectile) {
+  return projectile.x + projectile.radius > 0 &&
+    projectile.x - projectile.radius < canvas.width &&
+    projectile.y + projectile.radius > 0 &&
+    projectile.y - projectile.radius < canvas.height
+}
+
+function checkHittingPlayer(enemy) {
+  const distance = distanceBetweenTwoPoints(player.x, player.y, enemy.x, enemy.y);
+  return distance - enemy.radius - player.radius < 0;
+}
+
+function checkHittingEnemy(enemy) {
+  projectiles.some((projectile, index) => {
+    const distance = distanceBetweenTwoPoints(projectile.x, projectile.y, enemy.x, enemy.y);
+    if (distance - enemy.radius - projectile.radius > 0) return false;
+
+    removeProjectileByIndex(index);
+    enemy.health--;
+
+    if (enemy.health < 1) {
+      increaseScore();
+      enemy.createExplosion(particles);
     }
 
-    function init() {
-        const movementlimits = {
-            minX: 0,
-            maxX: canvas.width,
-            minY: 0,
-            minY: canvas.height,
-        };
-    player = new Player(canvas.width/2, canvas.height/2, context, movementlimits);
-    addEventListener('click', createProjectile);
-    }
+    return true;
+  });
+}
 
-    function createProjectile(event) {
-        projectiles.push(
-        new Projectile(
-            player.x,
-            player.y,
-            event.clientX,
-            event.clientY,
-            OffscreenCanvasRenderingContext2D
-        )
-        )
-    }
+function removeProjectileByIndex(index) {
+  projectiles.splice(index, 1);
+}
 
-    function spawnEnemies() {
-        let countOfSpawnEnemies = 1;
-
-        countIntervalId = setInterval(() => countOfSpawnEnemies++, 30000);
-        spawnIntervalId = setInterval(() => spawnCountEnemies(countOfSpawnEnemies), 1000);
-
-        spawnCountEnemies(countOfSpawnEnemies)
-    }
-
-    function spawnCountEnemies(count) {
-        for (let i = 0; i < count; i++) {
-            enemies.push(new Enemy(canvas,width, canvas.height, context, player));
-        }
-    }
-
-    function animate() {
-        animationId = requestAnimationFrame(animate);
-        context.clearRect(0, 0, canvas.width, canvas.height);
-
-        particles = particles.filter(particle => particle.alpha > 0);
-        projectiles = projectiles.filter(projectileInsideWindows);
-        enemies.forEach(enemy => checkHittingEnemy(enemy));
-        enemies = enemies.filter(enemy => enemy.health > 0);
-        const isGameOver = enemies.some(checkHittingEnemy);
-        if (isGameOver) {
-            document.addEventListener('click', () => {
-                audio.pause();
-            })
-            audioDeath.play();
-            wastedElement.computedStyleMap.display = 'block';
-            clearInterval (countIntervalId);
-            clearInterval (spawnIntervalId);
-            cancelAnimationFrame(animationId);
-        }
-
-        particles.forEach(particle => particle.update());
-        projectiles.forEach(projectile => projectile.update());
-        player.update();
-        enemies.forEach(enemy => enemy.update());
-    }
-
-    function projectileInsideWindow(projectile) {
-        return projectile.x + projectile.radius > 0 &&
-        projectile.x - projectile.raduis < canvas.width &&
-        projectile.y - projectile.radius > 0 &&
-        projectile.y - projectile.radius < canvas.height
-    }
-
-    function checkHittingPLayer(enemy) {
-        const distance = distanceBetweenTwoPoints(player.x, player.y, enemy.x, enemy.y);
-        return distance -enemy.radius - player.radius < 0;
-    }
-
-    function checkHittingEnemy(enemy) {
-    projectiles.some((projectile, index) => {
-        const distance = distanceBetweenTwoPoints(projectile.x, projectile.y, enemy.x, enemy.y);
-        if (distance - enemy.radius - projectile.radius > 0) return false;
-
-        removeProjectileByIndex(index);
-        enemy.health--;
-
-        if (enemy.health < 1) {
-            increaseScore();
-            enemy.creatExplosion(oarticles);
-        }
-
-        return true;
-    })
-    }
-
-    function removeProjectileByIndex(index) {
-        projectile.splice(index, 1);
-    }
-
-    function increaseScore() {
-        score += 16;
-        score.innerHTML = score;
-    }
+function increaseScore() {
+  score += 16;
+  scoreEl.innerHTML = score;
+}
